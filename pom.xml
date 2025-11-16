@@ -54,11 +54,6 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-web-search-engine-tavily</artifactId>
-            <version>1.8.0-beta15</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-web-search-engine-tavily</artifactId>
             <version>1.8.0-beta15</version> <!-- replace with the version you are using -->
         </dependency>
         <dependency>
@@ -71,6 +66,11 @@
             <artifactId>primefaces</artifactId>
             <version>15.0.2</version>
             <classifier>jakarta</classifier>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-embeddings-all-minilm-l6-v2</artifactId>
+            <version>1.8.0-beta15</version>
         </dependency>
     </dependencies>
 

@@ -1,28 +1,22 @@
 package ma.emsi.elboudadi.tp4jakartaeeweb;
 
-
 import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
 import dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
+import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.embedding.bge.small.en.v15.BgeSmallEnV15EmbeddingModel;
+import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
-import dev.langchain4j.web.search.WebSearchEngine;
-import dev.langchain4j.web.search.WebSearchContentRetriever;
-import dev.langchain4j.web.search.tavily.TavilyWebSearchEngine;
-import dev.langchain4j.retriever.ContentRetriever;
-import dev.langchain4j.retriever.impl.EmbeddingStoreContentRetriever;
-import dev.langchain4j.rag.content.retriever.DefaultRetrievalAugmentor;
-import dev.langchain4j.rag.content.retriever.RetrievalAugmentor;
-import dev.langchain4j.rag.query.router.DefaultQueryRouter;
+// Import for the corrected class name (EmbeddingStoreContentRetriever)
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
+import ma.emsi.elboudadi.tp4jakartaeeweb.llm.Assistant;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -37,91 +31,74 @@ import java.util.List;
 public class RagService {
 
     private Assistant assistant;
-    private final String LLM_KEY = System.getenv("GEMINI_API_KEY");
-    private final String TAVILY_KEY = System.getenv("TAVILY_API_KEY");
+    private final String LLM_KEY = System.getenv("GEMINI-API-KEY");
 
     @PostConstruct
     public void init() {
-        if (LLM_KEY == null || LLM_KEY.isEmpty()) {
-            System.err.println("❌ GEMINI_API_KEY not set. RAG service will not function.");
-            return;
-        }
-
-        // 1. Models
-        ChatModel chatModel = GoogleAiGeminiChatModel.builder()
-                .apiKey(LLM_KEY)
-                .modelName("gemini-2.0-flash") // or "gemini-2.5-flash" if available
-                .logRequestsAndResponses(true)
-                .build();
-
-        EmbeddingModel embeddingModel = new BgeSmallEnV15EmbeddingModel();
-
-        // 2. Document ingestion
-        EmbeddingStore<TextSegment> iaEmbeddingStore = new InMemoryEmbeddingStore<>();
-        EmbeddingStore<TextSegment> nonIaEmbeddingStore = new InMemoryEmbeddingStore<>();
-
         try {
-            Path iaDocPath = Paths.get(getClass().getResource("/docs/docia.pdf").toURI());
-            Path nonIaDocPath = Paths.get(getClass().getResource("/docs/doc-nonia.pdf").toURI());
+            if (LLM_KEY == null || LLM_KEY.isEmpty()) {
+                System.err.println("GEMINI_API_KEY not set.");
+                return;
+            }
 
-            DocumentSplitter splitter = DocumentSplitters.recursive(300, 30);
+            // 1️⃣ Chat model (Gemini)
+            ChatModel chatModel = GoogleAiGeminiChatModel.builder()
+                    .apiKey(LLM_KEY)
+                    .modelName("gemini-pro")
+                    .logRequestsAndResponses(true)
+                    .build();
+
+            // 2️⃣ Embedding model
+            EmbeddingModel embeddingModel = new AllMiniLmL6V2EmbeddingModel();
+
+            // 3️⃣ In-memory store for your PDFs
+            EmbeddingStore<TextSegment> store = new InMemoryEmbeddingStore<>();
+
+            // 4️⃣ Load and index PDFs
             ApacheTikaDocumentParser parser = new ApacheTikaDocumentParser();
+            DocumentSplitter splitter = DocumentSplitters.recursive(300, 30);
 
-            // IA document
-            Document iaDocument = FileSystemDocumentLoader.loadDocument(iaDocPath, parser);
-            List<TextSegment> iaSegments = splitter.split(iaDocument);
+            Path iaPath = Paths.get(getClass().getResource("/docs/machinelearning.pdf").toURI());
+            Path nonIaPath = Paths.get(getClass().getResource("/docs/ERP.pdf").toURI());
+
+            // Process IA document
+            Document iaDoc = FileSystemDocumentLoader.loadDocument(iaPath, parser);
+            List<TextSegment> iaSegments = splitter.split(iaDoc);
             List<Embedding> iaEmbeddings = embeddingModel.embedAll(iaSegments).content();
-            iaEmbeddingStore.addAll(iaEmbeddings, iaSegments);
+            store.addAll(iaEmbeddings, iaSegments);
 
-            // Non-IA document
-            Document nonIaDocument = FileSystemDocumentLoader.loadDocument(nonIaDocPath, parser);
-            List<TextSegment> nonIaSegments = splitter.split(nonIaDocument);
+            // Process non-IA document
+            Document nonIaDoc = FileSystemDocumentLoader.loadDocument(nonIaPath, parser);
+            List<TextSegment> nonIaSegments = splitter.split(nonIaDoc);
             List<Embedding> nonIaEmbeddings = embeddingModel.embedAll(nonIaSegments).content();
-            nonIaEmbeddingStore.addAll(nonIaEmbeddings, nonIaSegments);
+            store.addAll(nonIaEmbeddings, nonIaSegments);
 
-            // 3. Content retrievers
-            ContentRetriever iaDocRetriever = EmbeddingStoreContentRetriever.builder()
-                    .embeddingStore(iaEmbeddingStore)
+            // 5️⃣ Retriever from store
+            // 💡 FIX: Use the builder pattern to pass the EmbeddingStore and EmbeddingModel
+            EmbeddingStoreContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+                    .embeddingStore(store)
                     .embeddingModel(embeddingModel)
-                    .maxResults(2)
-                    .minScore(0.5)
+                    .maxResults(3) // Retrieve the top 3 most relevant segments
                     .build();
 
-            WebSearchEngine tavilyEngine = TavilyWebSearchEngine.builder()
-                    .apiKey(TAVILY_KEY)
-                    .build();
-
-            ContentRetriever webRetriever = WebSearchContentRetriever.builder()
-                    .webSearchEngine(tavilyEngine)
-                    .maxResults(3)
-                    .build();
-
-            // 4. Query Router (combines document and web retrievers)
-            ContentRetriever combinedRetriever = DefaultQueryRouter.builder()
-                    .contentRetriever(iaDocRetriever)
-                    .contentRetriever(webRetriever)
-                    .build();
-
-            // 5. Retrieval Augmentor
-            RetrievalAugmentor retrievalAugmentor = DefaultRetrievalAugmentor.builder()
-                    .contentRetriever(combinedRetriever)
-                    .build();
-
-            // 6. Assistant setup
+            // 6️⃣ Build assistant with RAG
+            // The contentRetriever method is correct from the previous step's fix.
             this.assistant = AiServices.builder(Assistant.class)
                     .chatModel(chatModel)
-                    .retrievalAugmentor(retrievalAugmentor)
+                    .contentRetriever(retriever)
                     .build();
 
+            System.out.println("RAG service initialized successfully.");
+
         } catch (Exception e) {
-            System.err.println("⚠️ Error initializing RagService: " + e.getMessage());
             e.printStackTrace();
+            System.err.println("Error initializing RAG: " + e.getMessage());
         }
     }
 
     public String chat(String userMessage) {
         if (assistant == null) {
-            return "❌ Erreur : Le service RAG n'a pas pu être initialisé (vérifiez les clés API).";
+            return "RAG service not initialized (missing API key or error at startup).";
         }
         return assistant.chat(userMessage);
     }
