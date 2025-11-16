@@ -41,11 +41,11 @@ public class RagTavily {
             var parser = new ApacheTikaDocumentParser();
             EmbeddingModel embeddingModel = new AllMiniLmL6V2EmbeddingModel();
 
-            ContentRetriever retrRag = buildRetriever("rag.pdf", parser, embeddingModel);
-            ContentRetriever retrCuisine = buildRetriever("cuisine.pdf", parser, embeddingModel);
+            ContentRetriever retrRag = buildRetriever("docs/ERP.pdf", parser, embeddingModel);
+            ContentRetriever retrCuisine = buildRetriever("docs/Machinelearning.pdf", parser, embeddingModel);
 
             // ====================== Tavily ======================
-            String tavilyKey = System.getenv("TAVILY_KEY");
+            String tavilyKey = System.getenv("TAVILY_API_KEY");
             if (tavilyKey == null || tavilyKey.isBlank()) {
                 throw new IllegalStateException("TAVILY_KEY manquante !");
             }
@@ -60,7 +60,7 @@ public class RagTavily {
                     .build();
 
             // ====================== Modèle Gemini ======================
-            String geminiKey = System.getenv("GEMINI_KEY");
+            String geminiKey = System.getenv("GEMINI-API-KEY");
             ChatModel model = GoogleAiGeminiChatModel.builder()
                     .apiKey(geminiKey)
                     .temperature(0.3)
