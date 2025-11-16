@@ -24,7 +24,7 @@ public class LlmClient {
 
     /** Constructeur : initialise le modèle Gemini */
     public LlmClient() {
-        String apiKey = System.getenv("GEMINI_KEY");
+        String apiKey = System.getenv("GEMINI-API-KEY");
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("Clé API GEMINI_KEY manquante !");
         }
